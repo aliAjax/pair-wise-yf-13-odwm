@@ -1,126 +1,94 @@
+import { useState } from "react";
 import "./styles.css";
+import { StoreProvider, useStore } from "./lib/store";
+import { DEVICES } from "./lib/helpers";
+import DraftBanner from "./components/DraftBanner";
+import ConflictPanel from "./components/ConflictPanel";
+import ShiftBar from "./components/ShiftBar";
+import MetricsBoard from "./components/MetricsBoard";
+import RecordForm from "./components/RecordForm";
+import InspectionTimeline from "./components/InspectionTimeline";
+import HistoryList from "./components/HistoryList";
 
-const project = {
-  "sourceNo": 1,
-  "id": "hxyfront-62001",
-  "port": 62001,
-  "title": "船舶轮机值班记录",
-  "domain": "船舶轮机",
-  "prompt": "我想做一个面向船舶轮机值班的前端记录系统，轮机员可以记录主机转速、滑油压力、冷却水温、燃油消耗、舱底水状态和异常巡检项。页面需要有值班班次切换、机舱参数看板、异常记录时间线、交接班摘要和按设备筛选的历史记录。数据先保存在浏览器本地，后续方便扩展成船队统一管理。",
-  "palette": [
-    "#0f766e",
-    "#2563eb",
-    "#f97316"
-  ],
-  "metrics": [
-    "主机转速",
-    "滑油压力",
-    "冷却水温",
-    "燃油消耗"
-  ],
-  "filters": [
-    "主机",
-    "发电机",
-    "泵组",
-    "舱底水"
-  ],
-  "fields": [
-    "值班班次",
-    "设备名称",
-    "参数读数",
-    "异常描述",
-    "处理状态",
-    "交接备注"
-  ],
-  "records": [
-    [
-      "08-12班",
-      "主机",
-      "转速82rpm，滑油压力0.42MPa",
-      "正常巡检"
-    ],
-    [
-      "12-16班",
-      "发电机#2",
-      "冷却水温偏高",
-      "已安排复查"
-    ],
-    [
-      "16-20班",
-      "舱底水",
-      "液位接近警戒线",
-      "已记录交班"
-    ]
-  ]
-};
+function HeroBar() {
+  const { operator, setOperator, simulateFailure, setSimulateFailure, drafts, notice } = useStore();
+
+  return (
+    <section className="hero">
+      <div className="hero-top">
+        <div>
+          <p>hxyfront-62001 · 船舶轮机值班记录</p>
+          <h1>轮机值班记录台</h1>
+        </div>
+        <div className="hero-tools">
+          <label className="operator-input">
+            <span>操作者</span>
+            <input value={operator} onChange={(event) => setOperator(event.target.value)} placeholder="值班轮机员姓名" />
+          </label>
+          <label className="sim-toggle">
+            <input
+              type="checkbox"
+              checked={simulateFailure}
+              onChange={(event) => setSimulateFailure(event.target.checked)}
+            />
+            <span>模拟存储写入失败</span>
+          </label>
+          <span className={`save-status ${drafts.length > 0 ? "has-draft" : ""}`}>
+            {drafts.length > 0 ? `有 ${drafts.length} 项草稿待提交` : "已保存到本浏览器"}
+          </span>
+        </div>
+      </div>
+      <span>
+        值班班次、机舱参数与异常巡检项均保存在浏览器本地（localStorage），刷新不丢失；设备历史按班次筛选。交接班后班次锁定，未处理异常自动带入新班次；多个标签页同时保存时按更新时间与操作者合并，冲突项单列确认；存储失败保留草稿，重试合并后继续。
+      </span>
+      {notice && <div className="notice-toast">{notice}</div>}
+    </section>
+  );
+}
+
+function Workspace() {
+  const [deviceFilter, setDeviceFilter] = useState<string | null>(null);
+
+  return (
+    <>
+      <MetricsBoard />
+      <section className="workspace">
+        <aside className="panel">
+          <h2>设备筛选</h2>
+          <div className="chips">
+            <button className={deviceFilter === null ? "active" : ""} onClick={() => setDeviceFilter(null)}>
+              全部
+            </button>
+            {DEVICES.map((device) => (
+              <button
+                key={device}
+                className={deviceFilter === device ? "active" : ""}
+                onClick={() => setDeviceFilter(device)}
+              >
+                {device}
+              </button>
+            ))}
+          </div>
+          <p className="filter-tip">筛选同时作用于异常巡检时间线与设备历史记录。</p>
+        </aside>
+        <RecordForm />
+      </section>
+      <InspectionTimeline deviceFilter={deviceFilter} />
+      <HistoryList deviceFilter={deviceFilter} />
+    </>
+  );
+}
 
 function App() {
   return (
     <main className="app">
-      <section className="hero">
-        <p>{project.id} · 源提示词{project.sourceNo} · Port {project.port}</p>
-        <h1>{project.title}</h1>
-        <span>{project.prompt}</span>
-      </section>
-
-      <section className="metrics">
-        {project.metrics.map((metric: string, index: number) => (
-          <article key={metric}>
-            <small>{metric}</small>
-            <strong>{[86, 14, 7, 32][index] ?? 12}</strong>
-          </article>
-        ))}
-      </section>
-
-      <section className="workspace">
-        <aside className="panel">
-          <h2>{project.domain}筛选</h2>
-          <div className="chips">
-            {project.filters.map((item: string) => (
-              <button key={item}>{item}</button>
-            ))}
-          </div>
-        </aside>
-
-        <section className="panel form-panel">
-          <div className="heading">
-            <div>
-              <p>专业字段</p>
-              <h2>新增记录</h2>
-            </div>
-            <button className="primary">保存草稿</button>
-          </div>
-          <div className="field-grid">
-            {project.fields.map((field: string) => (
-              <label key={field}>
-                <span>{field}</span>
-                <input placeholder={"填写" + field} />
-              </label>
-            ))}
-          </div>
-        </section>
-      </section>
-
-      <section className="panel">
-        <div className="heading">
-          <div>
-            <p>历史记录</p>
-            <h2>近期工作台</h2>
-          </div>
-          <button>导出摘要</button>
-        </div>
-        <div className="records">
-          {project.records.map((record: string[], index: number) => (
-            <article key={record.join("-")}>
-              <b>{String(index + 1).padStart(2, "0")}</b>
-              <div>
-                <h3>{record[0]}</h3>
-                <p>{record.slice(1).join(" · ")}</p>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
+      <StoreProvider>
+        <HeroBar />
+        <DraftBanner />
+        <ConflictPanel />
+        <ShiftBar />
+        <Workspace />
+      </StoreProvider>
     </main>
   );
 }
